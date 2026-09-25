@@ -17,7 +17,7 @@ forks-CQT-S14/
 From the `forks-CQT-S14` repo root:
 
 ```bash
-cd "/Users/elis/Desktop/Work/PROJECTS/Quantum/forks-CQT-S14"
+cd "~/forks-CQT-S14"
 python3 -m venv .venv_conditional_operations
 .venv_conditional_operations/bin/pip install --upgrade pip
 .venv_conditional_operations/bin/pip install -r CQT-conditional-operations/requirements.txt
