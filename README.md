@@ -1,118 +1,102 @@
 # CQT-conditional-operations
 
-Notebooks, NQCH hardware-script sources, and a public guide for Qibo's
-measurement-dependent `IfElse` / `Switch` API. The implementation lives in the
-sibling **CQT-qibo** repository; this repository contains demonstrations.
+Notebooks, NQCH runner scripts, and a public guide for Qibo's
+measurement-dependent `IfElse` / `Switch` API. The API implementation lives in
+**CQT-qibo**; the separately developed **qm-backend** package makes the established
+QASM/Qiskit/QM hardware route selectable through ordinary Qibo execution.
+This repository contains the demonstrations for both ways of using that route.
 
 ## Where to start
 
 | Location | Purpose |
 | --- | --- |
-| [docs/index.md](docs/index.md) | API vocabulary and NumPy simulation examples; source for the GitHub Pages guide. |
+| [docs/index.md](docs/index.md) | API vocabulary and native NumPy simulation examples; source for the GitHub Pages guide. |
 | [Notebook 0](notebooks/0_Executing_dynamic_circuits_in_python_OpenQASM3.ipynb) | Original Qiskit/OpenQASM 3 exploration. |
-| [Notebook 1](notebooks/1_Testing_examples_hardware_run.ipynb) | Initial Qibo examples and local simulation. |
-| [Notebook 2](notebooks/2_Hardware_Demo_Conditional_Operations.ipynb) | Earlier hardware demos: single-round reset, T-gate teleportation, and injected-error repetition with a SWAP. |
-| [Notebook 3](notebooks/3_Hardware_Demo_Conditional_Operations.ipynb) | Current four-demo reference: two-round reset, T-gate teleportation with a local reference, quantum teleportation, and repetition exercising all four syndromes. Includes saved runs and plots. |
-| [nqch_scripts/](nqch_scripts/) | Hardware-script sources: files `0`–`3` preserve earlier tests; files `4`–`7` accompany notebook 3. |
+| [notebooks/direct_hardware_path/](notebooks/direct_hardware_path/) | Earlier demonstrations using the direct hardware route. Notebook 1 contains initial examples; notebook 2 preserves earlier circuit versions. |
+| [Direct-path notebook 3](notebooks/direct_hardware_path/3_Hardware_Demo_Conditional_Operations.ipynb) | Four-demo reference: two-round reset, T-gate teleportation with a local reference, quantum state teleportation, and repetition exercising all four syndromes. Includes saved hardware results and plots. |
+| [QM-backend_Conditional_Ops.ipynb](notebooks/qm-backend_path/QM-backend_Conditional_Ops.ipynb) | All four circuits through `qm-backend`: local circuit drawings, submission of the notebook's own code, result retrieval and plots. |
+| [QM-backend_FastReset.ipynb](notebooks/qm-backend_path/QM-backend_FastReset.ipynb) | Fast-reset-only version of the backend notebook workflow. |
+| [nqch_scripts/direct_hardware_path/](nqch_scripts/direct_hardware_path/) | Separate server-script sources for the direct route. Files `0`–`3` preserve earlier tests; files `4`–`7` accompany direct-path notebook 3. |
+| [nqch_scripts/qm-backend_path/](nqch_scripts/qm-backend_path/) | Simple standalone backend runners: `fast_reset.py`, `t_gate_teleportation.py`, `quantum_state_teleportation.py`, and `repetition_code.py`. `runner.py` preserves the original fast-reset runner. |
 
-Files named `EO_*` are ignored by this repository's `.gitignore` and are local
-working copies. A date in a filename does not establish when saved outputs were
-generated. The parent workspace's
-[5 November handoff](../docs/Current_status/Current_status_05Nov.md) records the
-timeline, branch state, saved results, and remaining limitations.
 
-## Simulation and hardware execution
+## Two hardware paths
 
-Local `circuit(nshots=...)` uses Qibo's native simulator, supported on NumPy and
-qibojit Numba CPU. The conditional API is available on the fork's `develop` and
-`eo-switch-native-execution` branches; the reviewed local refs both point to
-`65779943a`.
-
-The hardware demos use:
+### Direct hardware path
 
 ```text
-Qibo → OpenQASM 3 → Qiskit → physical layout and QM target-gate translation
-  → provider's Qiskit QM backend → OpenQASM 3 → qm-qasm → QUA → hardware
+Notebook submits an existing server script
+  → script constructs the Qibo circuit
+  → OpenQASM 3 → Qiskit → physical placement and QM target-gate translation
+  → Qiskit QM provider → OpenQASM 3 → qm-qasm → QUA → hardware
+  → script prints measurements → notebook retrieves logs and plots
 ```
 
-Newer project notes record a `qm-qasm` update enabling the register comparisons
-used by `Switch`; the initial constant-`False` compiler failure is historical.
-Saved hardware runs include repetition-code `Switch` execution.
+These notebooks execute a separately maintained script already on the server.
+Changing a local circuit cell does not change that script. This is the route
+with successful hardware demonstrations, including `Switch` in the repetition
+experiment. The early constant-False QUA comparison problem was addressed by a
+subsequent compiler update; it is not the current observed failure.
 
-**Hardware submission cells perform real SSH/Slurm submissions.** They execute
-the prepared Python script already on the server, not the circuit in the local
-simulation cell. Local edits do not automatically update that server script.
-Submission is reserved for the user; do not execute those cells during onboarding.
+### QM backend path
 
-## Environment
-
-The notebook runs against a dedicated virtual environment, `.venv_conditional_operations`, located one level up (as a sibling of this folder):
-
+```text
+Notebook's own stored code, or a standalone runner
+  → qibo.set_backend("qm-backend", platform="sinq20", physical_qubits=...)
+  → circuit(nshots=...)
+  → backend owns QASM export, Qiskit import, placement, target translation
+    and offline QUA preflight
+  → same downstream Qiskit QM provider → QM hardware execution
+  → Qibo-compatible result, including intermediate measurement histories
 ```
+
+The backend notebook builds the circuit locally for drawing and stores the same
+construction code. Its submission cell sends backend setup, that construction
+code, and execution/result extraction over SSH to Slurm. It does **not** depend
+on an analogous `.py` script being installed on the server. Counts are returned
+as a JSON line in the Slurm output and retrieved for plotting.
+
+The standalone runners are an alternative: each selects the backend and defines the circuit, then it can be sbatched into a real slurm job directly.
+Placement is supplied by the user. The prototype retains the established Qiskit
+transpilation steps; it does not provide automatic placement or general routing.
+`platform="sinq20"` names a QuAM/QM configuration, not a QiboLab platform or its
+pulse-compilation route. See the sibling [qm-backend README](../qm-backend/README.md)
+for configuration and result APIs.
+
+## Environments
+
+The local notebook environment is the sibling `.venv_conditional_operations`:
+
+```text
 forks-CQT-S14/
-├── .venv_conditional_operations/   <- the venv
-└── CQT-conditional-operations/     <- this folder
+├── .venv_conditional_operations/
+├── CQT-qibo/
+├── qm-backend/
+└── CQT-conditional-operations/
 ```
 
-### Create/recreate the environment
+Use the CQT-qibo fork's **`eo-qm-backend`** branch to be bale to use the qm-backend path for executing on hardware.
+(commit `e475bc635d605f77487f1f7438faa7097ad23a3a` or a compatible descendant).
+It admits the backend's conditional circuits and lets it handle transpilation.
+Public `qibo==0.3.7` alone does not contain that integration. Native conditional simulation remains available on NumPy and qibojit Numba CPU.
 
-From the `forks-CQT-S14` repo root:
+The backend notebook's Mac kernel needs the conditional-operation Qibo fork,
+IPython, NumPy, pandas and matplotlib. The QM dependencies and hardware backend
+run on the server, not in that local drawing kernel. The older direct-path
+notebooks may also need Qiskit/Aer and drawing dependencies.
 
-```bash
-cd "~/forks-CQT-S14"
-python3 -m venv .venv_conditional_operations
-.venv_conditional_operations/bin/pip install --upgrade pip
-.venv_conditional_operations/bin/pip install -r CQT-conditional-operations/requirements.txt
-```
+[`requirements.txt`](requirements.txt) is a partial notebook dependency list,
+not a complete lockfile: it does not reproduce the editable Qibo fork or the
+QM/QuAM environment and omits pandas. Do not treat installing that file alone
+as a complete setup recipe. This file contains the required dependencies of the original first notebook built by Roman. 
 
-[`requirements.txt`](requirements.txt) pins selected notebook packages, but is
-**not a complete environment lockfile**. The commands above install that subset;
-they do not reproduce the editable Qibo checkout, every notebook import, or the
-QM/QuAM/provider stack. Current demo notebooks also import pandas, which is not
-listed there, and insert the sibling CQT-qibo `src` directory into their import
-path. Recreating a working environment requires checking those additional needs.
-The existing freeze filter below records only its selected packages:
+The server environments are separate:
 
-```bash
-.venv_conditional_operations/bin/pip freeze | grep -iE '^(qiskit|matplotlib|pylatexenc|numpy|jupyter|ipykernel)' > CQT-conditional-operations/requirements.txt
-```
+| Use | Environment |
+| --- | --- |
+| Established direct-script route | `/mnt/scratch/nqch-deploy/eo-switch-native-execution-venv` |
+| New backend development/execution | `/mnt/home/nqch-deploy/test-qm-backend/.venv` |
 
-Installed packages and why:
-- `qiskit` — core circuit construction, `if_test` conditionals, OpenQASM 3 dump/load
-- `qiskit-ibm-runtime` — `QiskitRuntimeService`, `MidCircuitMeasure`
-- `qiskit-aer` — `AerSimulator`
-- `matplotlib` + `pylatexenc` — required by `qc.draw(output='mpl')`
-- `numpy` — random state generation in the teleportation example
-- `jupyter` + `ipykernel` — running the notebook and registering it as a selectable kernel
-
-### Running the notebook directly
-
-```bash
-source ../.venv_conditional_operations/bin/activate
-jupyter notebook
-```
-
-Then open the relevant notebook under `notebooks/`; start with notebook 3 for
-the current demos. Review submission cells before execution.
-
-## Using the environment as a kernel in VS Code
-
-Register the venv as a Jupyter kernel (only needs to be done once):
-
-```bash
-cd "/Users/elis/Desktop/Work/PROJECTS/Quantum/forks-CQT-S14"
-.venv_conditional_operations/bin/python -m ipykernel install --user --name conditional-operations --display-name "venv_conditional_ops"
-```
-
-Then in VS Code:
-1. Open the notebook.
-2. Click the kernel picker in the top-right corner.
-3. Choose **Select Another Kernel** → **Jupyter Kernel** → **venv_conditional_ops**.
-
-Alternatively, you can skip the `ipykernel install` step and point VS Code directly at the venv's interpreter: **Select Another Kernel** → **Python Environments** → browse to `../.venv_conditional_operations/bin/python`.
-
-## Notes
-
-- The original Qiskit exploration's `QiskitRuntimeService()` calls are commented
-  out. That observation does not apply to the later hardware notebooks, whose
-  submission cells actively launch NQCH jobs when executed.
+The backend's [environment.md](../qm-backend/environment.md) records the original first-time package-recovery procedure and server setup (ie. how to install all hidden Paul dependencies). It also documents the
+retained `cma` version conflict between Qibo and qibocal; the demonstrated
+hardware route does not call CMA.
